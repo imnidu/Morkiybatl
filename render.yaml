@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: battleship-online
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
