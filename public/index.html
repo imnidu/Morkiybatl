@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Морський бій — онлайн дуель</title>
+  <meta name="description" content="Класичний морський бій онлайн для двох: створи кімнату, надішли другу 4-значний код і потопи його флот.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚓</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Rubik:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-screen="lobby">
+  <canvas id="sea" aria-hidden="true"></canvas>
+
+  <div id="app">
+    <header id="topbar">
+      <button id="brand" class="brand" type="button">⚓ МОРСЬКИЙ БІЙ</button>
+      <div class="top-actions">
+        <div id="room-chip" class="room-chip hidden">КОД <b id="room-code">----</b>
+          <button id="copy-code" class="mini-btn" type="button" title="Скопіювати код">⧉</button>
+        </div>
+        <div id="conn" class="conn"><span class="dot"></span><span id="conn-text">онлайн</span></div>
+        <button id="sound-btn" class="icon-btn" type="button" aria-pressed="true" title="Увімкнути / вимкнути звук">🔊</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- ЛОБІ -->
+      <section id="screen-lobby" class="screen active">
+        <div class="hero">
+          <div class="hero-kicker">ОНЛАЙН ДУЕЛЬ · 2 ГРАВЦІ · БЕЗ РЕЄСТРАЦІЇ</div>
+          <h1>МОРСЬКИЙ<br><span>БІЙ</span></h1>
+          <p class="tagline">Розстав флот. Надішли другу 4-значний код. Потопи все, що плаває.</p>
+        </div>
+
+        <div class="lobby-grid">
+          <div class="card">
+            <h2>⚓ Створити гру</h2>
+            <p>Отримай код кімнати та надішли його супернику — або поділися посиланням.</p>
+            <button id="btn-create" class="btn primary big" type="button">Створити кімнату</button>
+            <div id="created" class="created hidden">
+              <div class="code-digits" id="code-digits"></div>
+              <div class="copy-row">
+                <button id="btn-copy" class="btn ghost" type="button">⧉ Код</button>
+                <button id="btn-copy-link" class="btn ghost" type="button">🔗 Посилання</button>
+              </div>
+              <div class="waiting"><span class="radar"></span> Чекаємо на суперника…</div>
+              <button id="btn-cancel" class="btn text" type="button">Скасувати</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>🎯 Приєднатися</h2>
+            <p>Введи код, який надіслав друг.</p>
+            <input id="join-input" class="code-input" inputmode="numeric" autocomplete="off"
+                   maxlength="4" placeholder="0000" aria-label="Код кімнати, 4 цифри">
+            <button id="btn-join" class="btn primary big" type="button">У бій</button>
+          </div>
+        </div>
+
+        <details class="rules">
+          <summary>📜 Правила та як грати</summary>
+          <ul>
+            <li>Поле 10×10. Флот: 1 чотирипалубний, 2 трипалубні, 3 двопалубні, 4 однопалубні.</li>
+            <li>Кораблі не можуть торкатися навіть кутами — між ними мінімум 1 клітинка.</li>
+            <li>Влучив — ходиш ще раз. Промахнувся — хід переходить. На хід дається 30 секунд.</li>
+            <li>Потоплений корабель автоматично обводиться промахами по контуру.</li>
+            <li>Перемагає той, хто першим знищить усі 10 кораблів суперника.</li>
+            <li>Обрив зв'язку: 60 секунд на відновлення, інакше — технічна поразка.</li>
+            <li>Після бою можна зіграти реванш — обидва гравці мають підтвердити.</li>
+          </ul>
+        </details>
+        <footer class="foot">Node.js + Socket.IO · один сервер · один репозиторій</footer>
+      </section>
+
+      <!-- РОЗСТАНОВКА -->
+      <section id="screen-placement" class="screen">
+        <div class="phase-head">
+          <h2>🛠 Розстановка флоту</h2>
+          <p id="place-status">Обери корабель у доці та клікни на поле.</p>
+        </div>
+        <div class="place-layout">
+          <div class="board-wrap"><div id="place-board" class="board own"></div></div>
+          <aside class="dock-panel">
+            <h3>Док</h3>
+            <div id="dock"></div>
+            <div class="place-controls">
+              <button id="btn-rotate" class="btn ghost" type="button">↻ Горизонтально (R)</button>
+              <button id="btn-auto" class="btn ghost" type="button">🎲 Авто</button>
+              <button id="btn-clear" class="btn ghost" type="button">🗑 Очистити</button>
+              <button id="btn-ready" class="btn primary" type="button" disabled>✅ Готово</button>
+            </div>
+            <div id="opp-place-status" class="opp-status"></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- БІЙ -->
+      <section id="screen-battle" class="screen">
+        <div class="battle-top">
+          <div id="turn-banner" class="turn-banner"></div>
+          <div class="timer" id="timer" title="Час на хід">
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+              <circle class="t-bg" cx="22" cy="22" r="19"></circle>
+              <circle id="t-ring" cx="22" cy="22" r="19"></circle>
+            </svg>
+            <span id="t-num">30</span>
+          </div>
+          <button id="chat-toggle" class="btn ghost chat-toggle" type="button">💬 Чат
+            <span id="chat-badge" class="badge hidden">0</span>
+          </button>
+        </div>
+
+        <div id="opp-dc-banner" class="dc-banner hidden"></div>
+
+        <div class="battle-layout">
+          <div class="enemy-side">
+            <div class="board-title">🎯 Ворожі води <span id="enemy-fleet" class="fleet"></span></div>
+            <div id="enemy-board" class="board enemy"></div>
+          </div>
+          <div class="own-side">
+            <div class="board-title">🛡 Ваш флот <span id="own-fleet" class="fleet"></span></div>
+            <div id="own-board" class="board own small"></div>
+            <div class="battle-actions">
+              <button id="btn-surrender" class="btn text danger" type="button">🏳 Здатися / вийти</button>
+            </div>
+          </div>
+        </div>
+
+        <aside id="chat" class="chat" aria-label="Чат бою">
+          <div class="chat-head"><b>💬 Чат бою</b>
+            <button id="chat-close" class="icon-btn" type="button" aria-label="Закрити чат">✕</button>
+          </div>
+          <div id="chat-log" class="chat-log"></div>
+          <form id="chat-form" class="chat-form">
+            <input id="chat-input" maxlength="200" placeholder="Написати повідомлення…" autocomplete="off">
+            <button class="btn primary" type="submit" aria-label="Надіслати">➤</button>
+          </form>
+        </aside>
+      </section>
+    </main>
+
+    <div id="toasts" aria-live="polite"></div>
+
+    <!-- ПІДСУМОК -->
+    <div id="overlay-gameover" class="overlay hidden">
+      <div class="modal">
+        <div id="go-emoji" class="go-emoji">🏆</div>
+        <h2 id="go-title">Перемога!</h2>
+        <p id="go-reason"></p>
+        <div id="go-stats" class="go-stats"></div>
+        <div class="modal-actions">
+          <button id="btn-rematch" class="btn primary big" type="button">🔁 Реванш</button>
+          <button id="btn-exit" class="btn ghost" type="button">У лобі</button>
+        </div>
+        <div id="rematch-status" class="rematch-status"></div>
+      </div>
+    </div>
+
+    <!-- РЕКОНЕКТ -->
+    <div id="overlay-conn" class="overlay hidden">
+      <div class="modal small">
+        <div class="spinner"></div>
+        <h2>Відновлення з'єднання…</h2>
+        <p>Не закривай сторінку — гра відновиться автоматично.</p>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
